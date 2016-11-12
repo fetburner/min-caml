@@ -41,6 +41,12 @@ let rec fv = function (* 式に出現する（自由な）変数 (caml2html: kno
   | Put(x, y, z) -> S.of_list [x; y; z]
   | LetTuple(xs, y, e) -> S.add y (S.diff (fv e) (S.of_list (List.map fst xs)))
 
+let rec effect = function (* 副作用の有無 (caml2html: knormal_effect) *)
+  | Let(_, e1, e2) | IfEq(_, _, e1, e2) | IfLE(_, _, e1, e2) -> effect e1 || effect e2
+  | LetRec(_, e) | LetTuple(_, _, e) -> effect e
+  | App _ | Put _ | ExtFunApp _ -> true
+  | _ -> false
+
 let insert_let (e, t) k = (* letを挿入する補助関数 (caml2html: knormal_insert) *)
   match e with
   | Var(x) -> k x

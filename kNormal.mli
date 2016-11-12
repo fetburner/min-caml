@@ -25,4 +25,5 @@ type t =
 and fundef = { name : Id.t * Type.t; args : (Id.t * Type.t) list; body : t }
 
 val fv : t -> S.t
+val effect : t -> bool
 val f : Syntax.t -> t
