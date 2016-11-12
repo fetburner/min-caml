@@ -7,6 +7,7 @@ RESULT = min-caml
 NCSUFFIX = .opt
 CC = gcc
 CFLAGS = -g -O2 -Wall
+OCAMLLDFLAGS=-warn-error -31
 
 default: debug-code top $(RESULT) do_test
 $(RESULT): debug-code top
@@ -28,10 +29,11 @@ main.mli main.ml
 
 # ↓テストプログラムが増えたら、これも増やす
 TESTS = print sum-tail gcd sum fib ack even-odd \
-adder funcomp cls-rec cls-bug cls-bug2 \
+adder funcomp cls-rec cls-bug cls-bug2 cls-reg-bug \
 shuffle spill spill2 spill3 join-stack join-stack2 join-stack3 \
 join-reg join-reg2 non-tail-if non-tail-if2 \
-inprod inprod-rec inprod-loop matmul matmul-flat
+inprod inprod-rec inprod-loop matmul matmul-flat \
+manyargs
 
 do_test: $(TESTS:%=test/%.cmp)
 
