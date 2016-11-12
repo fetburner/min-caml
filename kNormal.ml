@@ -120,33 +120,17 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) 
   | Syntax.App(Syntax.Var(f), e2s) when not (M.mem f env) -> (* 外部関数の呼び出し (caml2html: knormal_extfunapp) *)
       (match M.find f !Typing.extenv with
       | Type.Fun(_, t) ->
-          let rec bind xs = function (* "xs" are identifiers for the arguments *)
-            | [] -> ExtFunApp(f, xs), t
-            | e2 :: e2s ->
-                insert_let (g env e2)
-                  (fun x -> bind (xs @ [x]) e2s) in
-          bind [] e2s (* left-to-right evaluation *)
+          bind env [] [] e2s (fun xs _ -> ExtFunApp(f, xs), t) (* left-to-right evaluation *)
       | _ -> assert false)
   | Syntax.App(e1, e2s) ->
       (match g env e1 with
       | _, Type.Fun(_, t) as g_e1 ->
           insert_let g_e1
             (fun f ->
-              let rec bind xs = function (* "xs" are identifiers for the arguments *)
-                | [] -> App(f, xs), t
-                | e2 :: e2s ->
-                    insert_let (g env e2)
-                      (fun x -> bind (xs @ [x]) e2s) in
-              bind [] e2s) (* left-to-right evaluation *)
+              bind env [] [] e2s (fun xs _ -> App(f, xs), t)) (* left-to-right evaluation *)
       | _ -> assert false)
   | Syntax.Tuple(es) ->
-      let rec bind xs ts = function (* "xs" and "ts" are identifiers and types for the elements *)
-        | [] -> Tuple(xs), Type.Tuple(ts)
-        | e :: es ->
-            let _, t as g_e = g env e in
-            insert_let g_e
-              (fun x -> bind (xs @ [x]) (ts @ [t]) es) in
-      bind [] [] es
+      bind env [] [] es (fun xs ts -> Tuple(xs), Type.Tuple(ts))
   | Syntax.LetTuple(xts, e1, e2) ->
       insert_let (g env e1)
         (fun y ->
@@ -165,7 +149,7 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) 
               ExtFunApp(l, [x; y]), Type.Array(t2)))
   | Syntax.Get(e1, e2) ->
       (match g env e1 with
-      |        _, Type.Array(t) as g_e1 ->
+      | _, Type.Array(t) as g_e1 ->
           insert_let g_e1
             (fun x -> insert_let (g env e2)
                 (fun y -> Get(x, y), t))
@@ -175,5 +159,12 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) 
         (fun x -> insert_let (g env e2)
             (fun y -> insert_let (g env e3)
                 (fun z -> Put(x, y, z), Type.Unit)))
+and bind env xs ts es k = (* "xs" and "ts" are identifiers and types for the elements *)
+  match es with
+  | [] -> k (List.rev xs) (List.rev ts)
+  | e :: es ->
+      let _, t as g_e = g env e in
+      insert_let g_e
+        (fun x -> bind env (x :: xs) (t :: ts) es k)
 
 let f e = fst (g M.empty e)
