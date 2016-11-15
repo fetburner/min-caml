@@ -47,6 +47,12 @@ let rec effect = function (* 副作用の有無 (caml2html: knormal_effect) *)
   | App _ | Put _ | ExtFunApp _ -> true
   | _ -> false
 
+let rec size = function
+  | IfEq(_, _, e1, e2) | IfLE(_, _, e1, e2)
+  | Let(_, e1, e2) | LetRec({ body = e1 }, e2) -> 1 + size e1 + size e2
+  | LetTuple(_, _, e) -> 1 + size e
+  | _ -> 1
+
 let insert_let (e, t) k = (* letを挿入する補助関数 (caml2html: knormal_insert) *)
   match e with
   | Var(x) -> k x
