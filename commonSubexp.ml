@@ -31,29 +31,66 @@ let rec equiv sub e1 e2 =
   | _, _ -> Alpha.g sub e1 = Alpha.g sub e2 (* tenuki *)
 
 let equiv sub e1 e2 =
-  try equiv sub e1 e2 with Invalid_argument _ -> false
+  try equiv sub e1 e2 with
+  (* inconsistent arity *)
+  | Invalid_argument _ -> false
 
 (* common subexpression elimination *)
 (* variable names must be unique *)
-let rec g env sub = function
-  | IfEq (x, y, e1, e2) -> IfEq (find x sub, find y sub, g env sub e1, g env sub e2)
-  | IfLE (x, y, e1, e2) -> IfLE (find x sub, find y sub, g env sub e1, g env sub e2)
+let rec g env fenv tpenv sub = function
+  | IfEq (x, y, e1, e2) ->
+      IfEq (find x sub, find y sub, g env fenv tpenv sub e1, g env fenv tpenv sub e2)
+  | IfLE (x, y, e1, e2) ->
+      IfLE (find x sub, find y sub, g env fenv tpenv sub e1, g env fenv tpenv sub e2)
   | Let ((x, t), e1, e2) ->
-      let e1' = g env sub e1 in
-      (try
-         if effect e1' then raise Not_found
-         else
+      let e1' = g env fenv tpenv sub e1 in
+      if effect e1' then
+        Let ((x, t), e1', g env fenv tpenv sub e2)
+      else
+        (try
            (* linear search *)
            (* super sanuki *)
-           (let (x', _) = List.find (fun (_, e) -> equiv sub e e1') env in
-            Format.eprintf "removing common subexpression %s@." x;
-            g env (M.add x x' sub) e2)
-       with
-       | Not_found ->
-           Let ((x, t), e1', g ((x, e1') :: env) sub e2))
-  | LetRec ({ body = e1 } as fundef, e2) ->
-      LetRec ({ fundef with body = g env sub e1 }, g env sub e2)
-  | LetTuple (xts, y, e) -> LetTuple (xts, find y sub, g env sub e)
+           let (x', _) = List.find (fun (_, e) -> equiv sub e e1') env in
+           Format.eprintf "removing common subexpression %s@." x;
+           g env fenv tpenv (M.add x x' sub) e2
+         with
+         | Not_found ->
+             Let ((x, t), e1', g ((x, e1') :: env) fenv tpenv sub e2))
+  | LetRec ({ name = (x, _); args = yts; body = e1 } as fundef, e2) ->
+      let e1' = g env fenv tpenv sub e1 in
+      (try
+         (* linear search *)
+         (* super tenuki *)
+         let (x', yts', e1') = List.find (fun (x', yts', e1') ->
+           try
+             equiv
+               (M.add_list2
+                 (List.map fst yts)
+                 (List.map fst yts')
+                 (M.add x x' sub)) e1 e1'
+           with
+           (* inconsistent arity *)
+           | Invalid_argument _ -> false) fenv in
+         Format.eprintf "removing common subexpression %s@." x;
+         (* function declarations have no side-effect *)
+         g env fenv tpenv (M.add x x' sub) e2
+      with
+      | Not_found ->
+          LetRec ({ fundef with body = e1' }, g env ((x, yts, e1) :: fenv) tpenv sub e2))
+  | LetTuple (xts, y, e) ->
+      let y' = find y sub in
+      (match M.find y' tpenv with
+       | xts' ->
+           Format.eprintf "removing common subexpression %s@."
+             (List.fold_right ( ^ ) (List.map (( ^ ) " ") @@ List.map fst xts) "");
+           (* projections have no side-effect *)
+           (* exception Invarid_argument must not be raised if well-typed *)
+           g env fenv tpenv
+             (M.add_list2
+               (List.map fst xts)
+               (List.map fst xts') sub) e
+       | exception Not_found ->
+           LetTuple (xts, y', g env fenv (M.add y' xts tpenv) sub e))
   | e -> Alpha.g sub e
 
-let f = g [] M.empty
+let f = g [] [] M.empty M.empty
