@@ -25,7 +25,8 @@ alpha.mli alpha.ml beta.mli beta.ml assoc.mli assoc.ml \
 inline.mli inline.ml constFold.mli constFold.ml elim.mli elim.ml \
 closure.mli closure.ml asm.mli asm.ml virtual.mli virtual.ml \
 simm.mli simm.ml regAlloc.mli regAlloc.ml emit.mli emit.ml \
-letFloating.ml letFloating.mli main.mli main.ml
+letFloating.ml letFloating.mli commonSubexp.ml commonSubexp.mli \
+main.mli main.ml
 
 # ↓テストプログラムが増えたら、これも増やす
 TESTS = print sum-tail gcd sum fib ack even-odd \
